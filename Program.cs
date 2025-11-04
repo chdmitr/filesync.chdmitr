@@ -11,7 +11,7 @@ var deserializer = new DeserializerBuilder()
 
 var cfg = deserializer.Deserialize<FileSyncConfig>(yaml);
 
-// --- подставляем переменные окружения ---
+// --- Подставляем переменные окружения ---
 foreach (var auth in cfg.Config.Auth)
 {
     if (auth.Username.StartsWith("env."))
@@ -37,7 +37,6 @@ if (string.IsNullOrWhiteSpace(logPath))
     Directory.CreateDirectory("logs");
     logPath = Path.Combine("logs", "filesync.log");
 }
-
 var rotation = cfg.Config.Log.Rotation ?? new FileSyncConfig.ConfigSection.LogSection.RotationSection();
 builder.Logging.AddFile(logPath, rotation.MaxSizeMb, rotation.MaxFiles);
 

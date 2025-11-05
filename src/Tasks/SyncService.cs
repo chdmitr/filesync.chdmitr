@@ -142,31 +142,16 @@ public class SyncService : BackgroundService
     private async Task DelayUntil(DateTime nextRun, CancellationToken ct)
     {
         TimeSpan delay = nextRun - DateTime.UtcNow;
-        if (delay <= TimeSpan.Zero)
-            return;
-
         var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
 
-        while (delay > TimeSpan.Zero)
+        while (delay > TimeSpan.Zero && !ct.IsCancellationRequested)
         {
             var chunk = delay > maxDelay ? maxDelay : delay;
 
             if (chunk > TimeSpan.FromMinutes(1))
-            {
-                var rounded = TimeSpan.FromMinutes(Math.Ceiling(chunk.TotalMinutes));
-                if (_logger.IsEnabled(LogLevel.Information))
-                    _logger.LogInformation("⏳ [DelayUntil] Waiting {Delay:dd\\.hh\\:mm\\:ss} until next run...", rounded);
-            }
+                _logger.LogInformation("⏳ [DelayUntil] Waiting {Delay:dd\\.hh\\:mm\\:ss} until next run...", chunk);
 
-            try
-            {
-                await Task.Delay(chunk, ct);
-            }
-            catch (TaskCanceledException)
-            {
-                _logger.LogInformation("Delay cancelled.");
-                return;
-            }
+            await Task.Delay(chunk, ct).ContinueWith(_ => {}, TaskContinuationOptions.OnlyOnCanceled);
 
             delay = nextRun - DateTime.UtcNow;
         }

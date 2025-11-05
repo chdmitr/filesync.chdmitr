@@ -18,8 +18,8 @@ config:
       - '* * * * *'
 
 files:
-  private: /data/private/
-  public: /data/public/
+  private: /data/private
+  public: /data/public
   mirror:
     base_path: /data/mirror
     data:

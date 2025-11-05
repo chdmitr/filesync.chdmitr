@@ -64,32 +64,28 @@ if (!File.Exists(privateCertPath))
     Environment.Exit(1);
 }
 
+// Локальная функция для подстановки переменной окружения
+static string ResolveEnv(string value, string field)
+{
+    if (!value.StartsWith("env."))
+        return value;
+
+    var varName = value["env.".Length..];
+    var envVar = Environment.GetEnvironmentVariable(varName);
+
+    if (!string.IsNullOrEmpty(envVar))
+        return envVar;
+
+    Console.Error.WriteLine($"❌ Missing environment variable: {varName} (for {field} field)");
+    Environment.Exit(1);
+    return string.Empty; // Недостижимо, но нужно для компиляции
+}
+
 // Подставляем переменные окружения
 foreach (var auth in cfg.Config.Auth)
 {
-    if (auth.Username.StartsWith("env."))
-    {
-        var varName = auth.Username["env.".Length..];
-        var envVar = Environment.GetEnvironmentVariable(varName);
-        if (string.IsNullOrEmpty(envVar))
-        {
-            Console.Error.WriteLine($"❌ Missing environment variable: {varName} (for username field)");
-            Environment.Exit(1);
-        }
-        auth.Username = envVar;
-    }
-
-    if (auth.Password.StartsWith("env."))
-    {
-        var varName = auth.Password["env.".Length..];
-        var envVar = Environment.GetEnvironmentVariable(varName);
-        if (string.IsNullOrEmpty(envVar))
-        {
-            Console.Error.WriteLine($"❌ Missing environment variable: {varName} (for password field)");
-            Environment.Exit(1);
-        }
-        auth.Password = envVar;
-    }
+    auth.Username = ResolveEnv(auth.Username, "username");
+    auth.Password = ResolveEnv(auth.Password, "password");
 }
 
 var builder = WebApplication.CreateBuilder(args);

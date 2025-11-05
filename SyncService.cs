@@ -46,8 +46,7 @@ namespace FileSyncServer
 
         public async Task SyncAll()
         {
-            _logger.LogInformation("Starting synchronization...");
-
+            _logger.LogInformation("🔄 Starting synchronization...");
             var mirrorBasePath = FileServerExtensions.NormalizePath(_cfg.Files.Mirror!.BasePath);
 
             foreach (var category in _cfg.Files.Mirror.Data)
@@ -63,8 +62,7 @@ namespace FileSyncServer
                     await SyncFile(localFile, remoteUrl);
                 }
             }
-
-            _logger.LogInformation("Synchronization finished.");
+            _logger.LogInformation("✅ Synchronization finished.");
         }
 
         private async Task SyncFile(string localPath, string url)

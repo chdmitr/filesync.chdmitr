@@ -11,7 +11,7 @@ var deserializer = new DeserializerBuilder()
 
 var cfg = deserializer.Deserialize<FileSyncConfig>(yaml);
 
-// --- Подставляем переменные окружения ---
+// Подставляем переменные окружения
 foreach (var auth in cfg.Config.Auth)
 {
     if (auth.Username.StartsWith("env."))
@@ -77,7 +77,7 @@ logger.LogInformation("Mirror root:       {Path}", FileSyncServer.FileServerExte
 logger.LogInformation("Sync schedule:     {Schedule}", string.Join(", ", cfg.Config.Sync.Schedule));
 logger.LogInformation("--------------------------------------------------");
 
-// --- ручной триггер только с localhost ---
+// Ручной триггер только с localhost
 app.MapPost("/sync/now", async (HttpContext ctx, SyncService sync, ILogger<Program> log) =>
 {
     var remoteIp = ctx.Connection.RemoteIpAddress;
@@ -92,4 +92,17 @@ app.MapPost("/sync/now", async (HttpContext ctx, SyncService sync, ILogger<Progr
     return Results.Ok(new { status = "started", time = DateTime.UtcNow });
 });
 
-app.Run();
+// Триггерим при старте
+if (args.Contains("--sync-at-start") || args.Contains("-s"))
+{
+    try
+    {
+        await app.Services.GetRequiredService<SyncService>().SyncAll();
+    }
+    catch (Exception ex)
+    {
+        logger.LogError("Sync at start failed: {ex}", ex.Message);
+    }
+}
+
+await app.RunAsync();

@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "configurations": [
+    {
+      "name": ".NET FileSyncServer (sync at start)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/bin/FileSyncServer",
+      "args": ["--sync-at-start"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+      }
+    }
+  ]
+}

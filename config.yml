@@ -24,4 +24,4 @@ files:
       unblock_lists:
         dnsmasq-nfset.lst: https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-dnsmasq-nfset.lst
       lampa:
-        etor.js: https://cub.red/plugin/etor
+        online_mod.js: https://nb557.github.io/plugins/online_mod.js

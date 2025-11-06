@@ -93,7 +93,7 @@ public class FileSyncTask : BackgroundService
             if (nextRun < now)
                 nextRun = now.AddMinutes(1);
 
-            _lastStatus = new SyncStatusInfo
+            UpdateStatus(new SyncStatusInfo
             {
                 LastRun = _lastStatus?.LastRun,
                 NextRun = nextRun,
@@ -101,7 +101,7 @@ public class FileSyncTask : BackgroundService
                 UpdatedFiles = _lastStatus?.UpdatedFiles ?? 0,
                 Status = _lastStatus?.Status ?? FileSyncStatus.Idle,
                 Error = _lastStatus?.Error
-            };
+            });
 
             var delay = nextRun - now;
             _logger.LogInformation(

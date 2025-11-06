@@ -5,6 +5,7 @@ using YamlDotNet.Serialization.NamingConventions;
 using FileSyncService;
 using FileSyncService.Tasks;
 using FileSyncService.Extensions;
+using FileServerExtensions = FileSyncService.Extensions.FileServerExtensions;
 
 const string configPath = "config.yml";
 
@@ -157,5 +158,37 @@ app.MapPost("/sync/now", async (HttpContext ctx, FileSyncTask sync, ILogger<Prog
     await sync.SyncAll(ct);
     return Results.Ok(new { status = "started", time = DateTime.Now });
 });
+
+// Main page
+var indexPath = Path.Combine(AppContext.BaseDirectory, "Static", "index.html");
+// Status data serialization
+app.MapGet("/meta.json", (FileSyncConfig cfg, FileSyncTask sync) =>
+{
+    var status = sync.LastStatus;
+    return Results.Json(new
+    {
+        publicPath = FileServerExtensions.NormalizePath(cfg.Files.Public),
+        privatePath = FileServerExtensions.NormalizePath(cfg.Files.Private),
+        mirrorPath = FileServerExtensions.NormalizePath(cfg.Files.Mirror.BasePath),
+        serverTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss zzz"),
+        syncStatus = status == null ? null : new
+        {
+            lastRun = status.LastRun?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz") ?? "---",
+            nextRun = status.NextRun?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz") ?? "---",
+            duration = status.Duration.ToString(@"hh\:mm\:ss\.fff"),
+            updatedFiles = status.UpdatedFiles,
+            status = status.Status.ToString(),
+            error = status.Error
+        }
+    });
+});
+// Отдача HTML при запросе на /
+app.MapGet("/", async context =>
+{
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.SendFileAsync(indexPath);
+});
+
+
 
 await app.RunAsync();

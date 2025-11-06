@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FileSyncService Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #121212;
+      color: #e0e0e0;
+      margin: 40px auto;
+      max-width: 700px;
+      padding: 20px;
+      border-radius: 12px;
+      background-color: #1e1e1e;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      color: #ffffff;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin-top: 20px;
+      color: #b0b0b0;
+    }
+
+    a {
+      color: #64b5f6;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #333;
+    }
+
+    .ok { color: #81c784; }
+    .error { color: #ef5350; }
+    .pending { color: #ffb74d; }
+
+    #lastUpdated {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h1>📁 FileSyncService Dashboard</h1>
+
+  <section>
+    <h2>Directories</h2>
+    <table>
+      <tr><td><a href="/public/">/public/</a></td><td id="publicPath"></td></tr>
+      <tr><td><a href="/private/">/private/</a></td><td id="privatePath"></td></tr>
+      <tr><td><a href="/mirror/">/mirror/</a></td><td id="mirrorPath"></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Mirror Sync Status</h2>
+    <table id="syncStatus">
+      <tr><td>Last run:</td><td id="lastRun">–</td></tr>
+      <tr><td>Next run:</td><td id="nextRun">–</td></tr>
+      <tr><td>Duration:</td><td id="duration">–</td></tr>
+      <tr><td>Files updated:</td><td id="updatedFiles">–</td></tr>
+      <tr><td>Status:</td><td id="status">–</td></tr>
+      <tr><td>Error:</td><td id="error">–</td></tr>
+    </table>
+    <div id="lastUpdated"></div>
+  </section>
+
+  <script>
+    async function loadMeta() {
+      try {
+        const r = await fetch('/meta.json', { cache: 'no-store' });
+        const meta = await r.json();
+
+        document.getElementById('publicPath').textContent = meta.publicPath;
+        document.getElementById('privatePath').textContent = meta.privatePath;
+        document.getElementById('mirrorPath').textContent = meta.mirrorPath;
+
+        const s = meta.syncStatus;
+        if (s) {
+          document.getElementById('lastRun').textContent = s.lastRun || "–";
+          document.getElementById('nextRun').textContent = s.nextRun || "–";
+          document.getElementById('duration').textContent = s.duration || "–";
+          document.getElementById('updatedFiles').textContent = s.updatedFiles ?? "–";
+
+          const st = document.getElementById('status');
+          if (s.status === "ok" || s.status === "Ok") {
+            st.textContent = "✅ Success";
+            st.className = "ok";
+          } else if (s.status === "error" || s.status === "Error") {
+            st.textContent = "⚠️ Error";
+            st.className = "error";
+          } else if (s.status === "running") {
+            st.textContent = "⏳ Running";
+            st.className = "pending";
+          } else {
+            st.textContent = s.status || "–";
+            st.className = "";
+          }
+
+          document.getElementById('error').textContent = s.error || "–";
+        } else {
+          document.getElementById('syncStatus').innerHTML =
+            "<tr><td colspan='2'>Sync has not been performed yet</td></tr>";
+        }
+
+        document.getElementById('lastUpdated').textContent =
+          `Updated: ${new Date().toLocaleTimeString()}`;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('lastUpdated').textContent = '⚠️ Failed to load data';
+      }
+    }
+
+    // Load immediately on open
+    loadMeta();
+    // Auto-refresh every 15 seconds
+    setInterval(loadMeta, 15000);
+  </script>
+</body>
+</html>

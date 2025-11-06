@@ -16,9 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="config.yml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    <None Update="config.yml" CopyToOutputDirectory="Always"/>
+    <Content Include="Static\**" CopyToOutputDirectory="Always" />
   </ItemGroup>
 
 </Project>

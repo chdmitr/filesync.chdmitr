@@ -1,23 +1,62 @@
 using Cronos;
+using FileServerExtensions = FileSyncService.Extensions.FileServerExtensions;
 
 namespace FileSyncService.Tasks;
 
+public enum FileSyncStatus
+{
+    Idle,
+    Running,
+    Ok,
+    Error
+}
+
+public class SyncStatusInfo
+{
+    public DateTime? LastRun { get; set; }
+    public DateTime? NextRun { get; set; }
+    public TimeSpan Duration { get; set; }
+    public int UpdatedFiles { get; set; }
+    public FileSyncStatus Status { get; set; } = FileSyncStatus.Idle;
+    public string? Error { get; set; }
+}
+
 public class FileSyncTask : BackgroundService
 {
-
     private readonly FileSyncConfig _cfg;
     private readonly ILogger<FileSyncTask> _logger;
-    private readonly HttpClient _client = new()
-    {
-        Timeout = TimeSpan.FromSeconds(5)
-    };
+    private readonly HttpClient _client;
     private bool _isSyncOnStartup = false;
 
-    public FileSyncTask(FileSyncConfig cfg, ILogger<FileSyncTask> log, bool isSyncOnStartup)
+
+    private SyncStatusInfo? _lastStatus;
+    private readonly object _statusLock = new();
+
+    public SyncStatusInfo LastStatus
+    {
+        get
+        {
+            lock (_statusLock)
+            {
+                return _lastStatus ?? new SyncStatusInfo
+                {
+                    LastRun = null,
+                    NextRun = null,
+                    Duration = TimeSpan.Zero,
+                    UpdatedFiles = 0,
+                    Status = FileSyncStatus.Idle,
+                    Error = null
+                };
+            }
+        }
+    }
+
+    public FileSyncTask(FileSyncConfig cfg, ILogger<FileSyncTask> logger, bool isSyncOnStartup)
     {
         _cfg = cfg;
-        _logger = log;
+        _logger = logger;
         _isSyncOnStartup = isSyncOnStartup;
+        _client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -37,7 +76,7 @@ public class FileSyncTask : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError("Sync at start failed: {ex}", ex.Message);
+                _logger.LogError(ex, "Sync at start failed");
             }
         }
 
@@ -54,6 +93,16 @@ public class FileSyncTask : BackgroundService
             if (nextRun < now)
                 nextRun = now.AddMinutes(1);
 
+            _lastStatus = new SyncStatusInfo
+            {
+                LastRun = _lastStatus?.LastRun,
+                NextRun = nextRun,
+                Duration = _lastStatus?.Duration ?? TimeSpan.Zero,
+                UpdatedFiles = _lastStatus?.UpdatedFiles ?? 0,
+                Status = _lastStatus?.Status ?? FileSyncStatus.Idle,
+                Error = _lastStatus?.Error
+            };
+
             var delay = nextRun - now;
             _logger.LogInformation(
                 "Next sync in {Delay:dd\\.hh\\:mm\\:ss} at {NextRun}",
@@ -63,35 +112,74 @@ public class FileSyncTask : BackgroundService
 
             await DelayUntil(nextRun, ct);
             if (!ct.IsCancellationRequested)
-            {
                 await SyncAll(ct);
-            }
         }
     }
 
     public async Task SyncAll(CancellationToken ct)
     {
-        _logger.LogInformation("🔄 Starting synchronization...");
-        var mirrorBasePath = Extensions.FileServerExtensions.NormalizePath(_cfg.Files.Mirror!.BasePath);
-
-        foreach (var category in _cfg.Files.Mirror.Data)
+        var startTime = DateTime.UtcNow;
+        var updatedCount = 0;
+        UpdateStatus(new SyncStatusInfo
         {
-            var dir = Path.Combine(mirrorBasePath, category.Key);
-            Directory.CreateDirectory(dir);
+            LastRun = startTime,
+            NextRun = null,
+            Status = FileSyncStatus.Running,
+            UpdatedFiles = 0,
+            Duration = TimeSpan.Zero
+        });
 
-            foreach (var kv in category.Value)
+        _logger.LogInformation("🔄 Starting synchronization...");
+
+        try
+        {
+            var mirrorBasePath = FileServerExtensions.NormalizePath(_cfg.Files.Mirror!.BasePath);
+
+            foreach (var category in _cfg.Files.Mirror.Data)
             {
-                var localFile = Path.Combine(dir, kv.Key);
-                var remoteUrl = kv.Value;
+                var dir = Path.Combine(mirrorBasePath, category.Key);
+                Directory.CreateDirectory(dir);
 
-                await SyncFile(localFile, remoteUrl, ct);
+                foreach (var kv in category.Value)
+                {
+                    var localFile = Path.Combine(dir, kv.Key);
+                    var remoteUrl = kv.Value;
+
+                    if (await SyncFile(localFile, remoteUrl, ct))
+                        updatedCount++;
+                }
             }
-        }
 
-        _logger.LogInformation("✅ Synchronization finished.");
+            var duration = DateTime.UtcNow - startTime;
+            UpdateStatus(new SyncStatusInfo
+            {
+                LastRun = startTime,
+                NextRun = null,
+                Duration = duration,
+                UpdatedFiles = updatedCount,
+                Status = FileSyncStatus.Ok
+            });
+
+            _logger.LogInformation("✅ Synchronization finished. Updated {Count} files.", updatedCount);
+        }
+        catch (Exception ex)
+        {
+            var duration = DateTime.UtcNow - startTime;
+            UpdateStatus(new SyncStatusInfo
+            {
+                LastRun = startTime,
+                NextRun = null,
+                Duration = duration,
+                UpdatedFiles = updatedCount,
+                Status = FileSyncStatus.Error,
+                Error = ex.Message
+            });
+
+            _logger.LogError(ex, "Synchronization failed");
+        }
     }
 
-    private async Task SyncFile(string localPath, string url, CancellationToken ct)
+    private async Task<bool> SyncFile(string localPath, string url, CancellationToken ct)
     {
         try
         {
@@ -110,7 +198,7 @@ public class FileSyncTask : BackgroundService
                     if (resp.StatusCode == System.Net.HttpStatusCode.NotModified)
                     {
                         _logger.LogInformation("No update for {File}", localPath);
-                        return;
+                        return false;
                     }
                     resp.EnsureSuccessStatusCode();
                     bytes = await resp.Content.ReadAsByteArrayAsync(ct);
@@ -119,6 +207,7 @@ public class FileSyncTask : BackgroundService
 
             await File.WriteAllBytesAsync(localPath, bytes, ct);
             _logger.LogInformation("Updated {File} ({Size} bytes)", localPath, bytes.Length);
+            return true;
         }
         catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
         {
@@ -131,6 +220,15 @@ public class FileSyncTask : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error syncing {File}", localPath);
+        }
+        return false;
+    }
+
+    private void UpdateStatus(SyncStatusInfo newStatus)
+    {
+        lock (_statusLock)
+        {
+            _lastStatus = newStatus;
         }
     }
 
@@ -150,7 +248,7 @@ public class FileSyncTask : BackgroundService
             if (chunk > TimeSpan.FromMinutes(1))
                 _logger.LogInformation("⏳ [DelayUntil] Waiting {Delay:dd\\.hh\\:mm\\:ss} until next run...", chunk);
 
-            await Task.Delay(chunk, ct).ContinueWith(_ => {}, CancellationToken.None);
+            await Task.Delay(chunk, ct).ContinueWith(_ => { }, CancellationToken.None);
 
             delay = nextRun - DateTime.UtcNow;
         }

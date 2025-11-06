@@ -1,19 +1,19 @@
 using Cronos;
 
-namespace FileSyncServer.Tasks;
+namespace FileSyncService.Tasks;
 
-public class SyncService : BackgroundService
+public class FileSyncTask : BackgroundService
 {
 
     private readonly FileSyncConfig _cfg;
-    private readonly ILogger<SyncService> _logger;
+    private readonly ILogger<FileSyncTask> _logger;
     private readonly HttpClient _client = new()
     {
         Timeout = TimeSpan.FromSeconds(5)
     };
     private bool _isSyncOnStartup = false;
 
-    public SyncService(FileSyncConfig cfg, ILogger<SyncService> log, bool isSyncOnStartup)
+    public FileSyncTask(FileSyncConfig cfg, ILogger<FileSyncTask> log, bool isSyncOnStartup)
     {
         _cfg = cfg;
         _logger = log;

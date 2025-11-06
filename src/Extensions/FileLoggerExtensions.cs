@@ -2,7 +2,7 @@
 
 using System.Text;
 
-namespace FileSyncServer.Extensions;
+namespace FileSyncService.Extensions;
 
 public static class FileLoggerExtensions
 {

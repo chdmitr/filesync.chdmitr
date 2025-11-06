@@ -2,11 +2,11 @@
   "version": "2.0.0",
   "configurations": [
     {
-      "name": ".NET FileSyncServer (sync at start)",
+      "name": ".NET FileSyncService (sync at start)",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/build/FileSyncServer",
+      "program": "${workspaceFolder}/build/FileSyncService",
       "args": ["--sync-at-start"],
       "cwd": "${workspaceFolder}/src",
       "console": "integratedTerminal",

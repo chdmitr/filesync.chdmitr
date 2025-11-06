@@ -1,4 +1,4 @@
-namespace FileSyncServer;
+namespace FileSyncService;
 
 public class FileSyncConfig
 {

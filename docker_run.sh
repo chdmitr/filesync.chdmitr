@@ -15,4 +15,4 @@ docker run -it --rm \
   -v $(pwd)/cert:/cert:ro \
   --env TEST_USERNAME=admin \
   --env TEST_PASSWORD=admin \
-  --name filesync filesyncserver
+  --name filesync filesync_service

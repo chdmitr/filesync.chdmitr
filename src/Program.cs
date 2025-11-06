@@ -2,9 +2,9 @@
 using System.Security.Cryptography.X509Certificates;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
-using FileSyncServer;
-using FileSyncServer.Tasks;
-using FileSyncServer.Extensions;
+using FileSyncService;
+using FileSyncService.Tasks;
+using FileSyncService.Extensions;
 
 const string configPath = "config.yml";
 
@@ -121,8 +121,8 @@ builder.WebHost.ConfigureKestrel(opt =>
 var needSyncOnStart = args.Contains("--sync-at-start") || args.Contains("-s");
 
 builder.Services.AddSingleton(cfg);
-builder.Services.AddSingleton(sp => ActivatorUtilities.CreateInstance<SyncService>(sp, needSyncOnStart));
-builder.Services.AddHostedService(provider => provider.GetRequiredService<SyncService>());
+builder.Services.AddSingleton(sp => ActivatorUtilities.CreateInstance<FileSyncTask>(sp, needSyncOnStart));
+builder.Services.AddHostedService(provider => provider.GetRequiredService<FileSyncTask>());
 
 var app = builder.Build();
 
@@ -131,20 +131,20 @@ app.MapStaticFiles(cfg);
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("--------------------------------------------------");
-logger.LogInformation(" FileSyncServer started");
+logger.LogInformation(" FileSyncService started");
 logger.LogInformation("--------------------------------------------------");
 logger.LogInformation("HTTPS port:        {Port}", cfg.Config.Https.Port);
 logger.LogInformation("Log file:          {LogPath}", Path.GetFullPath(logPath));
-logger.LogInformation("Public directory:  {Path}", FileSyncServer.Extensions.FileServerExtensions.NormalizePath(cfg.Files.Public));
-logger.LogInformation("Private directory: {Path}", FileSyncServer.Extensions.FileServerExtensions.NormalizePath(cfg.Files.Private));
-logger.LogInformation("Mirror root:       {Path}", FileSyncServer.Extensions.FileServerExtensions.NormalizePath("data/mirror"));
+logger.LogInformation("Public directory:  {Path}", FileSyncService.Extensions.FileServerExtensions.NormalizePath(cfg.Files.Public));
+logger.LogInformation("Private directory: {Path}", FileSyncService.Extensions.FileServerExtensions.NormalizePath(cfg.Files.Private));
+logger.LogInformation("Mirror root:       {Path}", FileSyncService.Extensions.FileServerExtensions.NormalizePath("data/mirror"));
 logger.LogInformation("Sync schedule:");
 foreach (var s in cfg.Config.Sync.Schedule)
     logger.LogInformation("  - {Schedule}", s);
 logger.LogInformation("--------------------------------------------------");
 
 // Ручной триггер только с localhost
-app.MapPost("/sync/now", async (HttpContext ctx, SyncService sync, ILogger<Program> log, CancellationToken ct) =>
+app.MapPost("/sync/now", async (HttpContext ctx, FileSyncTask sync, ILogger<Program> log, CancellationToken ct) =>
 {
     var remoteIp = ctx.Connection.RemoteIpAddress;
     if (remoteIp == null || !IPAddress.IsLoopback(remoteIp))

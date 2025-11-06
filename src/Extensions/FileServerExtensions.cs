@@ -11,7 +11,7 @@ public static class FileServerExtensions
 
         // Если путь абсолютный — оставляем
         if (Path.IsPathRooted(path))
-            return Path.GetFullPath(path);
+            return path;
 
         // Если относительный — строим относительно каталога приложения
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));

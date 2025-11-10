@@ -187,8 +187,8 @@ app.MapGet("/meta.json", (FileSyncConfig cfg, FileSyncTask sync) =>
         serverTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss zzz"),
         syncStatus = status == null ? null : new
         {
-            lastRun = status.LastRun?.ToString("yyyy-MM-dd HH:mm:ss zzz") ?? "",
-            nextRun = status.NextRun?.ToString("yyyy-MM-dd HH:mm:ss zzz") ?? "",
+            lastRun = status.LastRun is not null ? DateTime.SpecifyKind(status.LastRun.Value, DateTimeKind.Utc) : (object) "",
+            nextRun = status.NextRun is not null ? DateTime.SpecifyKind(status.NextRun.Value, DateTimeKind.Utc) : (object) "",
             duration = status.Duration.ToString(@"hh\:mm\:ss\.fff"),
             updatedFiles = status.UpdatedFiles,
             status = status.Status.ToString(),

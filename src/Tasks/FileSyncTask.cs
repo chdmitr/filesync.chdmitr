@@ -11,7 +11,7 @@ public enum FileSyncStatus
     Error
 }
 
-public class SyncStatusInfo
+public record SyncStatusInfo
 {
     public DateTime? LastRun { get; set; }
     public DateTime? NextRun { get; set; }
@@ -28,26 +28,21 @@ public class FileSyncTask : BackgroundService
     private readonly HttpClient _client;
     private bool _isSyncOnStartup = false;
 
-
     private SyncStatusInfo? _lastStatus;
-    private readonly object _statusLock = new();
 
     public SyncStatusInfo LastStatus
     {
         get
         {
-            lock (_statusLock)
+            return _lastStatus ?? new SyncStatusInfo
             {
-                return _lastStatus ?? new SyncStatusInfo
-                {
-                    LastRun = null,
-                    NextRun = null,
-                    Duration = TimeSpan.Zero,
-                    UpdatedFiles = 0,
-                    Status = FileSyncStatus.Idle,
-                    Error = null
-                };
-            }
+                LastRun = null,
+                NextRun = null,
+                Duration = TimeSpan.Zero,
+                UpdatedFiles = 0,
+                Status = FileSyncStatus.Idle,
+                Error = null
+            };
         }
     }
 
@@ -93,7 +88,7 @@ public class FileSyncTask : BackgroundService
             if (nextRun < now)
                 nextRun = now.AddMinutes(1);
 
-            UpdateStatus(new SyncStatusInfo
+            _lastStatus = new SyncStatusInfo
             {
                 LastRun = _lastStatus?.LastRun,
                 NextRun = nextRun,
@@ -101,7 +96,7 @@ public class FileSyncTask : BackgroundService
                 UpdatedFiles = _lastStatus?.UpdatedFiles ?? 0,
                 Status = _lastStatus?.Status ?? FileSyncStatus.Idle,
                 Error = _lastStatus?.Error
-            });
+            };
 
             var delay = nextRun - now;
             _logger.LogInformation(
@@ -120,14 +115,14 @@ public class FileSyncTask : BackgroundService
     {
         var startTime = DateTime.UtcNow;
         var updatedCount = 0;
-        UpdateStatus(new SyncStatusInfo
+        _lastStatus = new SyncStatusInfo
         {
             LastRun = startTime,
             NextRun = null,
             Status = FileSyncStatus.Running,
             UpdatedFiles = 0,
             Duration = TimeSpan.Zero
-        });
+        };
 
         _logger.LogInformation("🔄 Starting synchronization...");
 
@@ -151,21 +146,21 @@ public class FileSyncTask : BackgroundService
             }
 
             var duration = DateTime.UtcNow - startTime;
-            UpdateStatus(new SyncStatusInfo
+            _lastStatus = new SyncStatusInfo
             {
                 LastRun = startTime,
                 NextRun = null,
                 Duration = duration,
                 UpdatedFiles = updatedCount,
                 Status = FileSyncStatus.Ok
-            });
+            };
 
             _logger.LogInformation("✅ Synchronization finished. Updated {Count} files.", updatedCount);
         }
         catch (Exception ex)
         {
             var duration = DateTime.UtcNow - startTime;
-            UpdateStatus(new SyncStatusInfo
+            _lastStatus = new SyncStatusInfo
             {
                 LastRun = startTime,
                 NextRun = null,
@@ -173,7 +168,7 @@ public class FileSyncTask : BackgroundService
                 UpdatedFiles = updatedCount,
                 Status = FileSyncStatus.Error,
                 Error = ex.Message
-            });
+            };
 
             _logger.LogError(ex, "Synchronization failed");
         }
@@ -222,14 +217,6 @@ public class FileSyncTask : BackgroundService
             _logger.LogError(ex, "Error syncing {File}", localPath);
         }
         return false;
-    }
-
-    private void UpdateStatus(SyncStatusInfo newStatus)
-    {
-        lock (_statusLock)
-        {
-            _lastStatus = newStatus;
-        }
     }
 
     /// <summary>
